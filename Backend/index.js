@@ -1,18 +1,26 @@
-const express = require('express');
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const channelRoutes = require("./Routes/channelRoutes");
+
 const app = express();
-const port = 3000;
+const PORT = 4000;
 
-
+// Middlewares
+app.use(cors());
 app.use(express.json());
 
-///
+// Serve static files from Frontend folder
+app.use(express.static(path.join(__dirname, "../Frontend")));
 
-// Routes
-app.get('/', (req, res) => {
-  res.send('Hello, Express!');
+// Serve index.html for root route
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../Frontend/index.html"));
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+// API routes
+app.use("/api", channelRoutes);
+
+app.listen(PORT, () => {
+  console.log(`🚀 Backend running at http://localhost:${PORT}`);
 });

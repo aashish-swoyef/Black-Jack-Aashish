@@ -1,13 +1,64 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Blackjack Game Lobby</title>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 30px;
+      text-align: center;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    #channelInfo {
+      margin-top: 20px;
+      text-align: left;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Start Blackjack Game</h2>
+    <button onclick="startGame()">Start Game</button>
+
+    <div id="channelInfo" style="display:none;">
+      <h3>Channel Created</h3>
+      <p><strong>Channel ID:</strong> <span id="channelId"></span></p>
+      <pre id="channelData"></pre>
+    </div>
+  </div>
+
+  <script>
+    const userId = "user_" + Math.floor(Math.random() * 100000);
+
+    async function startGame() {
+      const res = await fetch("http://localhost:4000/api/create-channel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        document.getElementById("channelId").textContent = data.channelId;
+        document.getElementById("channelData").textContent = JSON.stringify(data.data, null, 2);
+        document.getElementById("channelInfo").style.display = "block";
+      } else {
+        alert("Error: " + data.message);
+      }
+    }
+  </script>
+</body>
 </html>
