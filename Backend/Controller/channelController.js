@@ -1,127 +1,115 @@
 const { v4: uuidv4 } = require("uuid");
-const redisClient = require("../Utils/redisClient"); // ✅ correct path
-const { createSentinel } = require("redis");
+const redisClient = require("../Utils/redisClient");
 
-
-//working function to create a channel
-
- function createChannel(){
+// Create a new channel
+function createChannel() {
   const channelId = uuidv4();
-  console.log("Channel created with ID:", channelId);
-  // sample json object with no data in it
   const channelData = {
     id: channelId,
     players: [],
     gameState: null,
   };
-
   redisClient.set(channelId, JSON.stringify(channelData));
+  console.log("Channel created with ID:", channelId);
   return channelId;
 }
 
-
-// check player count in channel
+// Get the number of players in a channel
 async function getPlayerCount(channelId) {
-  const channelData =  await redisClient.get(channelId);
+  const data = await redisClient.get(channelId);
+  if (!data) return 0;
 
-  console.log("Channel data:", channelData);
-
-  // gt players
-  console.log("Player data", JSON.parse(channelData).players);
-
-  const parsedData = JSON.parse(channelData);
-
-  console.log("Player count:", parsedData.players.length);
-
-  // count players in channel
-  return parsedData.players.length || 0; // return 0 if no players
+  const parsed = JSON.parse(data);
+  return parsed.players.length;
 }
 
-// check if player exists in channel
+// Check if a player exists in the channel
 async function playerExists(channelId, playerId) {
-  const channelData = await redisClient.get(channelId);
+  const data = await redisClient.get(channelId);
+  if (!data) return false;
 
-  const parsedChannelData = JSON.parse(channelData);
-  console.log("Parsed channel data:", parsedChannelData);
+  const parsed = JSON.parse(data);
+  return parsed.players.some(p => p.id === playerId);
+}
 
-  // check the player array if that player exists
-  const playerArray = parsedChannelData.players || [];
-  console.log("Player array:", playerArray);
+// Add a player to a channel
+async function addPlayerToChannel(channelId, playerId) {
+  const data = await redisClient.get(channelId);
+  if (!data) return false;
 
-  // check in that array looping. if found instantly break the loop the playerid is of tyype string
+  const parsed = JSON.parse(data);
+  const exists = await playerExists(channelId, playerId);
+  if (exists) return false;
 
-  for (let i = 0; i < playerArray.length; i++) {
-    console.log("Checking player:", playerArray[i].id);
-    if (playerArray[i] === playerId) {
-      console.log("Player exists in channel:", playerId);
-      return true; // player exists
+  parsed.players.push({ id: playerId });
+  await redisClient.set(channelId, JSON.stringify(parsed));
+  console.log(`Player ${playerId} added to channel ${channelId}`);
+  return true;
+}
+
+// Find the channel the player is already in
+async function findUserChannel(userId) {
+  const keys = await redisClient.keys("*");
+
+  for (let key of keys) {
+    const data = await redisClient.get(key);
+    const parsed = JSON.parse(data);
+    if (parsed.players.some(p => p.id === userId)) {
+      return key;
     }
   }
 
-  console.log("Player does not exist in channel:", playerId);
-  return false; // player does not exist
+  return null;
 }
 
-// put user in channel
-function addPlayerToChannel(channelId, playerId) {
-  // get channel data from redis
-  const channelData = redisClient.get(channelId);
-  // parse the channel data
-  const parsedChannelData = JSON.parse(channelData);
+// Find a channel with available space
+async function findAvailableChannel() {
+  const keys = await redisClient.keys("*");
 
-
-
-  // check if player already exists
-  if (playerExists(channelData, playerId)) {
-    console.log("Player already exists in channel:", playerId);
-    return false; // player already exists
+  for (let key of keys) {
+    const data = await redisClient.get(key);
+    const parsed = JSON.parse(data);
+    if (parsed.players.length < 4) {
+      return key;
+    }
   }
 
-  // add player to channel
-  parsedChannelData.playerArray.push(playerId);
-  redisClient.set(channelId, JSON.stringify(parsedChannelData));
-  console.log("Player added to channel:", playerId);
-  return true; // player added successfully
+  return null;
 }
 
-// request response for matchmaking with handled already exists, max player of 4 and creating channel if not channel found for the user to fit in
+// Matchmaking handler
 async function handleMatchmaking(userId) {
-  // Check if user is already in a channel
   const existingChannelId = await findUserChannel(userId);
-  if (existingChannelId) {
-    console.log("User is already in channel:", existingChannelId);
-    return existingChannelId;
+  if (existingChannelId) return existingChannelId;
+
+  const openChannelId = await findAvailableChannel();
+  if (openChannelId) {
+    await addPlayerToChannel(openChannelId, userId);
+    return openChannelId;
   }
 
-  // Find a channel with available slots
-  const availableChannelId = await findAvailableChannel();
-  if (availableChannelId) {
-    console.log("Found available channel:", availableChannelId);
-    addPlayerToChannel(availableChannelId, userId);
-    return availableChannelId;
-  }
-
-  // Create a new channel if none found
   const newChannelId = createChannel();
-  addPlayerToChannel(newChannelId, userId);
+  await addPlayerToChannel(newChannelId, userId);
   return newChannelId;
 }
-    
 
-function createsChannel(req, res){
-    //access request
-    const userId = req.body.userId;
+// API controller function
+async function createsChannel(req, res) {
+  const userId = req.body.userId;
+  if (!userId) return res.status(400).json({ message: "Missing userId" });
 
-    console.log("userid ", userId);
+  try {
+    const channelId = await handleMatchmaking(userId);
+    const data = await redisClient.get(channelId);
 
-    // check if already in channel
-    function  channelId =checkIfAlreadyinChannel(userId);
-    
-    // const channelId = createChannel();
-    const respObject = {
-      "channelId": channelId
-    };
-    res.send(JSON.stringify(respObject));
-} 
+    res.json({
+      channelId: channelId,
+      data: JSON.parse(data),
+    });
+  } catch (err) {
+    console.error("Error in matchmaking:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+}
 
-module.exports = {createsChannel};
+module.exports = { createsChannel };
