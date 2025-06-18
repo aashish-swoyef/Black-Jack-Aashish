@@ -10,6 +10,7 @@ const PORT = 4000;
 app.use(cors());
 app.use(express.json());
 
+
 // Serve static files from Frontend folder
 app.use(express.static(path.join(__dirname, "../Frontend")));
 

@@ -1,10 +1,11 @@
 const { v4: uuidv4 } = require("uuid");
 const redisClient = require("../Utils/redisClient"); // ✅ correct path
+const { createSentinel } = require("redis");
 
 
 //working function to create a channel
 
-function createChannel(){
+ function createChannel(){
   const channelId = uuidv4();
   console.log("Channel created with ID:", channelId);
   // sample json object with no data in it
@@ -105,3 +106,22 @@ async function handleMatchmaking(userId) {
   addPlayerToChannel(newChannelId, userId);
   return newChannelId;
 }
+    
+
+function createsChannel(req, res){
+    //access request
+    const userId = req.body.userId;
+
+    console.log("userid ", userId);
+
+    // check if already in challen
+    const channelId =checkIfAlreadyinChannel(userId);
+    
+    // const channelId = createChannel();
+    const respObject = {
+      "channelId": channelId
+    };
+    res.send(JSON.stringify(respObject));
+} 
+
+module.exports = {createsChannel};
