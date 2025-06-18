@@ -114,8 +114,8 @@ function createsChannel(req, res){
 
     console.log("userid ", userId);
 
-    // check if already in challen
-    const channelId =checkIfAlreadyinChannel(userId);
+    // check if already in channel
+    function  channelId =checkIfAlreadyinChannel(userId);
     
     // const channelId = createChannel();
     const respObject = {
