@@ -33,6 +33,8 @@ This project uses Docker Compose to spin up:
 ```bash
 git clone https://github.com/your-username/your-repo.git
 cd your-repo
+
+git checkout develop
 ```
 
 2. Start Docker services
