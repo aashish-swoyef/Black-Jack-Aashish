@@ -7,7 +7,9 @@ function createChannel() {
   const channelData = {
     id: channelId,
     players: [],
-    gameState: null,
+    gameState: {
+      phase: "waiting-for-players" // Initialize gameState with phase
+    },
   };
   redisClient.set(channelId, JSON.stringify(channelData));
   console.log("Channel created with ID:", channelId);
@@ -42,6 +44,12 @@ async function addPlayerToChannel(channelId, playerId) {
   if (exists) return false;
 
   parsed.players.push({ id: playerId });
+
+  // Update gameState.phase if player count reaches 4
+  if (parsed.players.length === 4) {
+    parsed.gameState.phase = "game-started";
+  }
+
   await redisClient.set(channelId, JSON.stringify(parsed));
   console.log(`Player ${playerId} added to channel ${channelId}`);
   return true;
@@ -69,7 +77,9 @@ async function findAvailableChannel() {
   for (let key of keys) {
     const data = await redisClient.get(key);
     const parsed = JSON.parse(data);
-    if (parsed.players.length < 4) {
+
+    // Only allow joining if phase is 'waiting-for-players'
+    if (parsed.players.length < 4 && parsed.gameState?.phase === "waiting-for-players") {
       return key;
     }
   }
@@ -95,19 +105,28 @@ async function handleMatchmaking(userId) {
 
 // API controller function
 async function createsChannel(req, res) {
-  const userId = req.body.userId;
-  if (!userId) return res.status(400).json({ message: "Missing userId" });
+  const users = req.body.users; // Accept an array of users
+
+  if (!Array.isArray(users) || users.length === 0) {
+    return res.status(400).json({ message: "Missing or invalid users array" });
+  }
 
   try {
-    const channelId = await handleMatchmaking(userId);
-    const data = await redisClient.get(channelId);
+    const results = [];
 
-    res.json({
-      channelId: channelId,
-      data: JSON.parse(data),
-    });
+    for (const user of users) {
+      const channelId = await handleMatchmaking(user.userId);
+      const data = await redisClient.get(channelId);
+      results.push({
+        userId: user.userId,
+        channelId,
+        data: JSON.parse(data)
+      });
+    }
+
+    res.json({ results });
   } catch (err) {
-    console.error("Error in matchmaking:", err);
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 }

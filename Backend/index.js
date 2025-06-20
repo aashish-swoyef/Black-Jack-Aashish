@@ -1,25 +1,35 @@
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 const path = require("path");
+const { Server } = require("socket.io");
+
 const channelRoutes = require("./Routes/channelRoutes");
+const registerSocketEvents = require("./socket");
 
 const app = express();
-const PORT = 4000;
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
 
-// Middlewares
+// Middleware
 app.use(cors());
 app.use(express.json());
-
-// Serve static files
 app.use(express.static(path.join(__dirname, "../Frontend")));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../Frontend/index.html"));
 });
 
-// API routes
 app.use("/api", channelRoutes);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running at http://localhost:${PORT}`);
+// Socket setup
+registerSocketEvents(io);
+
+const PORT = 4000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server listening on http://localhost:${PORT}`);
 });

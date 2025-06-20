@@ -53,3 +53,8 @@ docker compose up -d
 # See running services
 
 docker compose ps
+
+# installing socket
+
+npm install ws uuid redis express cors
+npm install socket.io
